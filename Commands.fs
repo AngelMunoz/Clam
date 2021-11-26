@@ -55,7 +55,12 @@ module Commands =
             printfn "No Repositories downloaded"
         else
             for entry in results do
-                printfn $"[{entry.createdAt.ToShortTimeString()}]{entry.fullName}: {entry.path}"
+                let date =
+                    match entry.updatedAt |> Option.ofNullable with
+                    | Some date -> date.ToShortDateString()
+                    | None -> entry.createdAt.ToShortDateString()
+
+                printfn $"[{date}] {entry.fullName} [{entry.branch}] -> {entry.path}"
 
     let runAdd (opts: RepositoryOptions) =
         result {
@@ -135,6 +140,28 @@ module Commands =
                 Path.Combine("./", opts.projectName)
                 |> Path.GetFullPath
 
-            Scaffolding.compileAndCopy templatePath targetPath {|  |}
+            let content =
+                let readTemplateScript =
+                    try
+                        File.ReadAllText(Path.Combine(templatePath, "templating.fsx"))
+                        |> Some
+                    with
+                    | _ -> None
+
+                let readRepoScript () =
+                    try
+                        File.ReadAllText(Path.Combine(repo.path, "templating.fsx"))
+                        |> Some
+                    with
+                    | _ -> None
+
+                readTemplateScript
+                |> Option.orElseWith (fun () -> readRepoScript ())
+
+            match content with
+            | Some content ->
+                Extensibility.getConfigurationFromScript content
+                |> Scaffolding.compileAndCopy templatePath targetPath
+            | None -> Scaffolding.compileAndCopy templatePath targetPath None
         }
         |> ignore

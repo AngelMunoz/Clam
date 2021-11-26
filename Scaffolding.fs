@@ -26,11 +26,11 @@ module Scaffolding =
         match repo with
         | Some repo ->
             Directory.CreateDirectory "./templates" |> ignore
-            try 
+
+            try
                 Directory.Delete(repo.path, true) |> ignore
             with
-            | :? DirectoryNotFoundException ->
-                printfn "Didn't delete Directory"
+            | :? DirectoryNotFoundException -> printfn "Didn't delete Directory"
 
             let relativePath =
                 Path.Join(repo.path, "../", "../")
@@ -51,16 +51,19 @@ module Scaffolding =
                 (files, next :: templates)
             else
                 (next :: files, templates)
+
         let opts = EnumerationOptions()
         opts.RecurseSubdirectories <- true
+
         Directory.EnumerateFiles(path, "*.*", opts)
+        |> Seq.filter (fun path -> not <| path.Contains(".fsx"))
         |> Seq.fold foldFilesAndTemplates (List.empty<string>, List.empty<string>)
 
-    let private compileFiles (payload: obj) (file: string) =
+    let private compileFiles (payload: obj option) (file: string) =
         let tpl = Template.Parse(file)
-        tpl.Render(payload)
+        tpl.Render(payload |> Option.toObj)
 
-    let compileAndCopy (origin: string) (target: string) (payload: obj) =
+    let compileAndCopy (origin: string) (target: string) (payload: obj option) =
         let (files, templates) = collectRepositoryFiles origin
 
         let copyFiles () =
@@ -75,10 +78,16 @@ module Scaffolding =
             templates
             |> Array.ofList
             |> Array.Parallel.iter (fun path ->
+                let target =
+                    path.Replace(origin, target).Replace(".tpl", "")
+
+                Directory.GetParent(target).Create()
+
+
                 let content =
                     File.ReadAllText(path) |> compileFiles payload
 
-                File.WriteAllText(content, path.Replace(origin, target).Replace(".tpl", "")))
+                File.WriteAllText(target, content))
 
         Directory.CreateDirectory(target) |> ignore
         copyFiles ()
