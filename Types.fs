@@ -27,8 +27,8 @@ type RepositoryOptions =
       branch: string }
 
 type ProjectOptions =
-    { name: string
-      nameKind: TemplateNameKind }
+    { projectName: string
+      templateName: string }
 
 type RepositoryArgs =
     | [<AltCommandLine("-n")>] RepositoryName of string
@@ -41,14 +41,14 @@ type RepositoryArgs =
             | Branch _ -> "Branch to pick the repository from, defaults to \"main\""
 
 type NewProjectArgs =
-    | [<AltCommandLine("-n")>] Name of string
-    | [<AltCommandLine("-k")>] NameKind of TemplateNameKind option
+    | [<AltCommandLine("-t")>] Template of string
+    | [<AltCommandLine("-n")>] ProjectName of string
 
     interface IArgParserTemplate with
         member s.Usage =
             match s with
-            | Name _ -> "Name of the template to use"
-            | NameKind _ -> "Choose between Username/repository (Full Name) and repository (Simple Name)."
+            | ProjectName _ -> "Name of the project to create."
+            | Template _ -> "Template to use for this project."
 
 type CliArguments =
     | [<CliPrefix(CliPrefix.None)>] List

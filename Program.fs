@@ -32,11 +32,8 @@ let runCommands (parser: ArgumentParser<CliArguments>) (args: string array) =
     | [ Remove repositoryName ] -> Commands.runRemove repositoryName
     | [ New subCommand ] ->
         let opts =
-            { name = subCommand.GetResult(Name)
-              nameKind =
-                subCommand.TryGetResult(NameKind)
-                |> Option.flatten
-                |> Option.defaultValue TemplateNameKind.SimpleName }
+            { projectName = subCommand.GetResult(ProjectName)
+              templateName = subCommand.GetResult(Template) }
 
         Commands.runNewProject opts
     | [ Version ] ->
