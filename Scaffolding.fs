@@ -1,6 +1,5 @@
 namespace Clam
 
-open System
 open System.IO
 open System.IO.Compression
 open Scriban
@@ -27,7 +26,11 @@ module Scaffolding =
         match repo with
         | Some repo ->
             Directory.CreateDirectory "./templates" |> ignore
-            Directory.Delete(repo.path, true) |> ignore
+            try 
+                Directory.Delete(repo.path, true) |> ignore
+            with
+            | :? DirectoryNotFoundException ->
+                printfn "Didn't delete Directory"
 
             let relativePath =
                 Path.Join(repo.path, "../", "../")
@@ -37,22 +40,23 @@ module Scaffolding =
                 Path.Combine(relativePath, $"{repo.name}.zip")
                 |> Path.GetFullPath
 
-            ZipFile.ExtractToDirectory(zipPath, "./templates/")
+            ZipFile.ExtractToDirectory(zipPath, "./templates")
             File.Delete(zipPath)
             Some repo
         | None -> None
 
-    let collectRepositoryFiles (path: string) =
+    let private collectRepositoryFiles (path: string) =
         let foldFilesAndTemplates (files, templates) (next: string) =
             if next.Contains(".tpl.") then
                 (files, next :: templates)
             else
                 (next :: files, templates)
-
-        Directory.EnumerateFiles(path, "*.*")
+        let opts = EnumerationOptions()
+        opts.RecurseSubdirectories <- true
+        Directory.EnumerateFiles(path, "*.*", opts)
         |> Seq.fold foldFilesAndTemplates (List.empty<string>, List.empty<string>)
 
-    let compileFiles (payload: obj) (file: string) =
+    let private compileFiles (payload: obj) (file: string) =
         let tpl = Template.Parse(file)
         tpl.Render(payload)
 
@@ -62,7 +66,10 @@ module Scaffolding =
         let copyFiles () =
             files
             |> Array.ofList
-            |> Array.Parallel.iter (fun file -> File.Copy(file, file.Replace(origin, target), true))
+            |> Array.Parallel.iter (fun file ->
+                let target = file.Replace(origin, target)
+                Directory.GetParent(target).Create()
+                File.Copy(file, target, true))
 
         let copyTemplates () =
             templates
