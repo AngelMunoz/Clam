@@ -9,12 +9,14 @@
     <Compile Include="Types.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="Scaffolding.fs" />
+    <Compile Include="Extensibility.fs" />
     <Compile Include="Commands.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Argu" Version="6.1.1" />
+    <PackageReference Include="FSharp.Compiler.Service" Version="41.0.1" />
     <PackageReference Include="FsHttp" Version="6.0.1" />
     <PackageReference Include="FsToolkit.ErrorHandling" Version="2.11.0" />
     <PackageReference Include="LiteDB" Version="5.0.11" />
