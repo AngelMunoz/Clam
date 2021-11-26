@@ -17,6 +17,16 @@ module Commands =
         | [| _ |] -> Error MissingRepoName
         | _ -> Error WrongGithubFormat
 
+    let private getTemplateAndChild (templateName: string) =
+        match
+            templateName.Split("/")
+            |> Array.filter (String.IsNullOrWhiteSpace >> not)
+            with
+        | [| user; template; child |] -> Some user, template, Some child
+        | [| template; child |] -> None, template, Some child
+        | [| template |] -> None, template, None
+        | _ -> None, templateName, None
+
     let private matchParseResult result =
         match result with
         | Ok _ -> ()
@@ -26,9 +36,9 @@ module Commands =
             printfn "The repository name should look like this:"
             printfn "Username/templateRepo"
 
-    let private updateRepo repoName branch =
+    let private updateRepo repoFullName branch =
         option {
-            let! repo = Database.findByName repoName
+            let! repo = Database.findByFullName repoFullName
             let repo = { repo with branch = branch }
 
             return!
@@ -51,11 +61,13 @@ module Commands =
         result {
             let! repoName = getRepoName opts.repositoryName
 
-            if Database.existsByName opts.repositoryName then
+            if Database.existsByFullName opts.repositoryName then
                 printfn "The Repository already exists, Do you want to update it? [y/N]"
 
                 match Console.ReadKey().Key with
-                | ConsoleKey.Y -> updateRepo repoName opts.branch |> ignore
+                | ConsoleKey.Y ->
+                    updateRepo opts.repositoryName opts.branch
+                    |> ignore
                 | _ -> ()
             else
                 let path =
@@ -83,21 +95,46 @@ module Commands =
     let runUpdate (opts: RepositoryOptions) =
         result {
             let! repoName = getRepoName opts.repositoryName
-            updateRepo repoName opts.branch |> ignore
+
+            match Database.findByFullName opts.repositoryName with
+            | Some repo -> updateRepo repo.fullName opts.branch |> ignore
+            | None -> ()
         }
         |> matchParseResult
 
 
-    let runRemove (name: string) =
+    let runRemove (fullName: string) =
         option {
-            let! repo = Database.findByName name
+            let! repo = Database.findByFullName fullName
             Directory.Delete(repo.path, true)
-            return! Database.deleteByName name
+            return! Database.deleteByFullName repo.fullName
         }
         |> fun result ->
             match result with
-            | Some true -> printfn $"{name} deleted from repositories."
-            | Some false -> printfn $"{name} could not be deleted from repositories."
+            | Some true -> printfn $"{fullName} deleted from repositories."
+            | Some false -> printfn $"{fullName} could not be deleted from repositories."
             | None -> printfn "Repository Not Fund"
 
-    let runNewProject (opts: ProjectOptions) = ()
+    let runNewProject (opts: ProjectOptions) =
+        option {
+            let (user, template, child) = getTemplateAndChild opts.templateName
+
+            let! repo =
+                match user, child with
+                | Some user, Some _ -> Database.findByFullName $"{user}/{template}"
+                | Some _, None -> Database.findByFullName opts.templateName
+                | None, _ -> Database.findByName template
+
+            let templatePath =
+                match child with
+                | Some child -> Path.Combine(repo.path, child)
+                | None -> repo.path
+                |> Path.GetFullPath
+
+            let targetPath =
+                Path.Combine("./", opts.projectName)
+                |> Path.GetFullPath
+
+            Scaffolding.compileAndCopy templatePath targetPath {|  |}
+        }
+        |> ignore
